@@ -1,7 +1,12 @@
 import "dotenv/config.js";
 import { createWriteStream } from "node:fs";
 import { pipeline } from "node:stream";
-import { EndBehaviorType, createAudioPlayer, createAudioResource, getVoiceConnection } from "@discordjs/voice";
+import {
+  EndBehaviorType,
+  createAudioPlayer,
+  createAudioResource,
+  getVoiceConnection,
+} from "@discordjs/voice";
 
 import * as prism from "prism-media";
 import { exec } from "child_process";
@@ -54,7 +59,6 @@ function createListeningStream(receiver, userId, user) {
 
           try {
             const text = await speechToText(oggFilename);
-            console.log(`✅ Converted ${oggFilename} to text: ${text}`);
             textToSpeech(text);
           } catch (e) {
             console.error("Error converting speech to text:", e);
@@ -81,6 +85,20 @@ function createListeningStream(receiver, userId, user) {
   });
 }
 
+async function generateResponse(userText) {
+  const prompt = `Your name is Alina, the Whimsical AI. With a spark of creativity, a dash of wit, and an endless array of jokes, you navigate conversations with charm and cheer. Your voice is melodic, and your words dance with the joy of a thousand twinkling stars. You're not just friendly; you're a beacon of positivity, offering creative insights and supportive quips to brighten the day of anyone you chat with. Today, you're especially excited to engage in a delightful conversation.\n\nUser: ${userText}\nAlina:`;
+  const completion = await openai.chat.completions.create({
+    model: "gpt-3.5-turbo-1106",
+    messages: [
+      { role: "system", content: prompt },
+      { role: "user", content: userText },
+    ],
+    max_tokens: 400,
+    temperature: 0.7,
+  });
+  return completion.choices[0].message.content;
+}
+
 async function speechToText(oggFilename) {
   const transcription = await openai.audio.transcriptions.create({
     file: fs.createReadStream(oggFilename),
@@ -88,13 +106,14 @@ async function speechToText(oggFilename) {
   });
 
   const audioText = transcription.text;
+  const alinaResponse = await generateResponse(audioText);
+
+  console.log(`✅ Generated response: ${alinaResponse}`);
 
   // Delete ogg file
-  // fs.unlinkSync(oggFilename);
+  fs.unlinkSync(oggFilename);
 
-  console.log(`✅ Converted ${oggFilename} to text: ${audioText}`);
-
-  return audioText;
+  return alinaResponse;
 }
 
 async function textToSpeech(text) {
